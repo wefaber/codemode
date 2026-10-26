@@ -1,0 +1,38 @@
+name: CI
+
+# Runs on GitHub-hosted runners on purpose: this repo is public, and a
+# self-hosted runner would execute fork PR code on the VPS. Hosted minutes are
+# free for public repositories. Self-hosted is reserved for deploys.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Format check
+        run: bun run fmt:check
+
+      - name: Check (tsc, oxlint, tests)
+        run: bun run check
