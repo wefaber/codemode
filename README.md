@@ -12,11 +12,11 @@ Code Mode collapses that into one script per task: intermediate data stays in th
 
 ## Read first
 
-| Document | What it defines |
-|---|---|
-| [`docs/SPEC.md`](docs/SPEC.md) | The standard: 12 rules, operation contract, sandbox contract, transports, auth, gateway, observability |
-| [`docs/PLAN.md`](docs/PLAN.md) | Nine phases with file paths, commands, verification and estimates |
-| [`docs/DECISIONS.md`](docs/DECISIONS.md) | D1/D2/D3 with the evidence behind each |
+| Document                                 | What it defines                                                                                        |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| [`docs/SPEC.md`](docs/SPEC.md)           | The standard: 12 rules, operation contract, sandbox contract, transports, auth, gateway, observability |
+| [`docs/PLAN.md`](docs/PLAN.md)           | Nine phases with file paths, commands, verification and estimates                                      |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | D1/D2/D3 with the evidence behind each                                                                 |
 
 ## The rules, compressed
 

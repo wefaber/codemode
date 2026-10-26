@@ -1,0 +1,88 @@
+name: Security
+
+# Same Semgrep OSS scan as the org reusable (wefaber/.github), but on a
+# GitHub-hosted runner: the reusable targets `self-hosted`, which is unsafe for
+# a public repo (fork PRs would run on the VPS). Rules and gate are the same.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    name: semgrep
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Semgrep
+        run: pip install --quiet semgrep
+
+      - name: Scan
+        run: |
+          semgrep scan --config auto --config p/secrets \
+            --exclude node_modules --exclude dist --exclude build \
+            --exclude .git --exclude '*.min.js' \
+            --json --output semgrep.json || true
+
+      - name: Summarize and gate
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+
+          fail_severity = os.environ.get("FAIL_SEVERITY", "ERROR")
+          order = {"INFO": 1, "WARNING": 2, "ERROR": 3}
+          threshold = order.get(fail_severity, 3)
+
+          try:
+              data = json.load(open("semgrep.json"))
+          except FileNotFoundError:
+              print("semgrep.json missing: scan did not run")
+              sys.exit(1)
+
+          findings = data.get("results", [])
+          lines = []
+          failing = []
+          for f in findings:
+              sev = f.get("extra", {}).get("severity", "INFO")
+              path = f.get("path", "?")
+              line = f.get("start", {}).get("line", 0)
+              rule = f.get("check_id", "?")
+              msg = f.get("extra", {}).get("message", "").splitlines()[0]
+              entry = f"- [{sev}] {path}:{line} `{rule}` — {msg}"
+              lines.append(entry)
+              if order.get(sev, 0) >= threshold:
+                  failing.append(entry)
+
+          summary = [f"Semgrep: {len(findings)} finding(s), {len(failing)} at or above {fail_severity}"]
+          summary.extend(lines or ["No findings."])
+          text = "\n".join(summary)
+          print(text)
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as fh:
+              fh.write(text + "\n")
+
+          if failing:
+              sys.exit(1)
+          PY
+        env:
+          FAIL_SEVERITY: ERROR
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-report
+          path: semgrep.json
+          if-no-files-found: ignore
