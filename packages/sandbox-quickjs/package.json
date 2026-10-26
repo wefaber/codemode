@@ -1,0 +1,19 @@
+{
+  "name": "@wefaber/codemode-sandbox-quickjs",
+  "version": "0.3.0",
+  "description": "WeFaber Code Mode sandbox adapter: QuickJS (wasm) in a terminable Bun Worker",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "!src/**/*.test.ts"
+  ],
+  "dependencies": {
+    "@wefaber/codemode": "workspace:*",
+    "quickjs-emscripten": "^0.32.0"
+  }
+}
