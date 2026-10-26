@@ -1,6 +1,6 @@
 # WeFaber Code Mode (WCM) — Estándar y Arquitectura
 
-Estado: propuesta v0.1 — 2026-10-26
+Estado: propuesta v0.2 — 2026-10-26 (v0.1 + correcciones por el estado real de mychecklist)
 Autor: Ether
 Alcance: todo producto de wefaber, faku-org, ohmyapps-org, adastra-org que exponga capacidades a un agente.
 
@@ -12,16 +12,16 @@ Cada producto resuelve su interfaz de agente por su cuenta:
 
 | Superficie | Transporte | Auth | Tools |
 |---|---|---|---|
-| `wegraph` (mcp.wefaber.net) | Streamable HTTP en CF Worker | Bearer `MCP_AUTH_TOKEN` único | 24 |
+| `wegraph` (hoy `mcp.wefaber.net`) | Streamable HTTP en CF Worker | Bearer `MCP_AUTH_TOKEN` único | 23 |
 | `kit` | stdio (Bun) | ninguna | 4 |
 | `ohmydiagrams` | HTTP + bridge + OAuth propio | OAuth | 11 |
 | `ohmydocs` | MCP embebido en la app | propia | 4 grupos |
-| `mychecklist` | diseñado, no implementado (ADR 0002) | Bearer sha256 por agente | 2 (plan) |
+| `mychecklist` | **implementado** (M5, ADR 0002 y 0007): `search` + `execute`, sandbox QuickJS en Worker | Bearer `mck_…` guardado como sha256, un token = usuario + org | 2 tools, 19 ops |
 | jobit, mercuria, lux, cdn-panel, wepanel, files | sin MCP | — | — |
 
 Consecuencias medidas:
 
-1. **Costo de contexto**: 24 tools de wegraf son varios miles de tokens de esquemas que se pagan en cada sesión, se usen o no.
+1. **Costo de contexto**: las 23 tools de wegraf son 16 670 bytes (~4 100 tokens) de esquemas que se pagan en cada sesión, se usen o no.
 2. **Round-trips**: `resolve_context → query_org_graph → trace_node` son tres idas al modelo para un solo razonamiento. Cada resultado intermedio vuelve al contexto completo.
 3. **Inconsistencia**: cuatro formas de autenticar, tres transportes, cero auditoría común. Un agente nuevo tiene que aprender cada servidor.
 4. **Duplicación**: cada producto reimplementa validación, límites, paginación y manejo de errores.
@@ -59,15 +59,15 @@ RFC 2119: **DEBE** = obligatorio, **DEBERÍA** = default con excepción justific
 
 **R3 — Las operaciones llaman al service layer existente.** Una operación no habla con la base ni con HTTP externo por su cuenta: llama al mismo servicio que usa GraphQL/REST. El sandbox no tiene red.
 
-**R4 — Nombres `producto.recurso.verbo`.** Verbo de un conjunto cerrado: `list`, `get`, `create`, `update`, `delete`, `search`, `run`. Dentro del sandbox: `codemode.checklist.items.create(...)`. Sin abreviaturas, sin nombres de tabla.
+**R4 — Nombres `producto.recurso.verbo`.** Verbos base: `list`, `get`, `create`, `update`, `delete`, `search`, `run`, `move`, `restore`. Un verbo fuera de ese conjunto (`rename`, `setDone`, `updateText`, `backlinks`) se acepta solo si la op declara `verbException: "<motivo>"`; queda en `spec.json` y es visible en review. Id: `^[a-z]+\.[a-z]+\.[a-z][a-zA-Z]*$`. Dentro del sandbox: `codemode.checklist.items.create(...)`. Sin abreviaturas, sin nombres de tabla.
 
-**R5 — Scopes explícitos.** `producto:read`, `producto:write`, `producto:admin`. Cada operación declara el suyo. Las de efecto (`create/update/delete/run`) DEBEN declarar `write` o superior. Un token sin scope recibe `FORBIDDEN`, nunca un resultado vacío.
+**R5 — Scopes explícitos.** `producto:read`, `producto:write`, `producto:admin`. Cada operación declara el suyo. Equivalencia con el `mode` que ya usa mychecklist: `read` = `producto:read`, `write` = `producto:write`. Las de efecto (`create/update/delete/run`) DEBEN declarar `write` o superior. Un token sin scope recibe `FORBIDDEN`, nunca un resultado vacío.
 
 **R6 — Límites con techo.** Default: 5 s de reloj, 64 MB de memoria, 50 llamadas al host, 64 KB de resultado, 200 líneas de consola, 512 KB de stack. Configurables, nunca ausentes. El deadline duro lo aplica un worker terminable, no el interrupt handler del intérprete.
 
 **R7 — Resultado mínimo.** La operación devuelve lo necesario para decidir, no la fila entera. `execute` trunca con marcador `--- TRUNCATED ---` en vez de cortar silenciosamente.
 
-**R8 — Spec con semver.** `spec.json` lleva `version`. Cambiar la firma de una operación es breaking = major. El gateway pinnea versión por producto y rechaza `execute` contra una major que no conoce.
+**R8 — Spec con semver.** `spec.json` lleva `version` como string semver (`"1.0.0"`; el `1` entero de mychecklist se migra). Cambiar la firma de una operación es breaking = major. El gateway pinnea versión por producto y rechaza `execute` contra una major que no conoce.
 
 **R9 — Credenciales fuera del sandbox.** El código recibe una función de request o un namespace ya autenticado. Nunca un token, una URL con secreto ni un header. Los tokens se guardan hasheados (sha256) por agente.
 
@@ -75,7 +75,7 @@ RFC 2119: **DEBE** = obligatorio, **DEBERÍA** = default con excepción justific
 
 **R11 — Generación verificable.** `spec.json` y `client.d.ts` se generan del registry. `bun run check` falla si están desactualizados. Un spec editado a mano es un bug de CI, no un atajo.
 
-**R12 — Errores con código, sin stack.** `TIMEOUT`, `TOO_MANY_CALLS`, `CODE_ERROR`, `HOST_ERROR`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION`. El modelo recibe el código y un mensaje accionable; el stack queda en el log del servidor.
+**R12 — Errores con código, sin stack.** `TIMEOUT`, `TOO_MANY_CALLS`, `CODE_ERROR`, `HOST_ERROR`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION`, `RATE_LIMITED`, `PRODUCT_UNAVAILABLE`, `SPEC_MISMATCH` (la lista canónica es `WCM_ERROR_CODES` en `@wefaber/codemode`). El modelo recibe el código y un mensaje accionable; el stack queda en el log del servidor.
 
 ---
 
@@ -115,7 +115,7 @@ Reglas del handler:
 
 ## 5. Contrato del sandbox
 
-Interfaz única, dos adaptadores:
+Interfaz única, tres adaptadores:
 
 ```ts
 export interface Sandbox {
@@ -167,7 +167,7 @@ El `code` es siempre el cuerpo de una función async; el resultado es JSON seria
 
 ## 7. Auth y scopes
 
-- Token por agente: `wcm_<producto>_<32 hex>`, guardado como `sha256` en la tabla `api_tokens` del producto. Se muestra una sola vez.
+- Token por agente: formato nuevo `wcm_<producto>_<32 hex>`, guardado como `sha256` en la tabla `api_tokens` del producto. Se muestra una sola vez. Los prefijos que un producto ya emitió (`mck_` en mychecklist) siguen siendo válidos; el formato solo aplica a tokens nuevos.
 - El token lleva: producto(s), scopes, rate limit, etiqueta de agente, expiración opcional.
 - El gateway reenvía identidad firmada (HMAC con `WCM_GATEWAY_SECRET`) al producto: `x-wcm-token-hash`, `x-wcm-scopes`, `x-wcm-via: gateway`. El producto no confía en el body.
 - Efectos secundarios irreversibles (`delete`) DEBERÍAN pedir un paso de confirmación (patrón `propose`/`confirm` que wegraf ya usa) o un scope `admin`.

@@ -2,9 +2,9 @@
 
 Objetivo: un paquete compartido, un estándar verificable y un gateway único; migrar `mcp.wefaber.net` y todos los repos con superficie de agente.
 
-Estándar que implementa: `./SPEC.md` (v0.1).
+Estándar que implementa: `./SPEC.md` (v0.2).
 
-Estimación total: **~58 h** de trabajo efectivo, en 9 fases. Cada fase termina en un PR revisable, no en un deploy.
+Estimación total: **~53 h** de trabajo efectivo, en 9 fases. Cada fase termina en un PR revisable, no en un deploy.
 
 Convenciones: `[P0]` urgente · `[P1]` alta · `[P2]` media · `[P3]` cuando haya tiempo.
 
@@ -29,7 +29,7 @@ Repo nuevo: `wefaber/codemode` (privado, Bun + TypeScript).
 ```
 packages/core/src/{registry,spec,errors,limits,run}.ts
 packages/sandbox-quickjs/src/{sandbox,worker}.ts
-packages/sandbox-workers/src/sandbox.ts
+packages/sandbox-quickjs-wasm/src/sandbox.ts   # se implementa en Fase 4 (wegraf)
 packages/mcp/src/{handler,search,execute}.ts
 packages/cli/src/index.ts
 tests/conformance/
@@ -91,38 +91,37 @@ Es `mychecklist/server/mcp/sandbox.ts` tal cual (284 líneas ya probadas: límit
 
 ---
 
-## Fase 2 — `mychecklist` como implementación de referencia (8 h) [P0]
+## Fase 2 — `mychecklist` consume el paquete (3 h) [P0]
 
-Ya tiene el ADR (0002), el sandbox y el diseño. Es el producto que valida el estándar antes de tocar wegraf.
+mychecklist ya tiene Code Mode en producción (M5, ADR 0002 y 0007): 19 ops, registry con `defineOp`, sandbox QuickJS en
+Worker, `search` + `execute`, tokens `mck_`. La fase no porta nada: cambia el origen del código por `@wefaber/codemode*`
+y alinea el contrato al SPEC. Es el producto que valida el estándar antes de tocar wegraf.
 
-### Task 2.1 — Portar el sandbox al paquete (30 min)
+### Task 2.1 — Reemplazar el código local por los paquetes (1 h)
 
-**Modificar**: `mychecklist/server/mcp/sandbox.ts` → importa de `@wefaber/codemode-sandbox-quickjs`. Borrar el archivo local, dejar el test.
+**Borrar**: `server/mcp/{sandbox,worker,exec,limiter,protocol,codemode,spec}.ts` y sus tests (viven en el paquete).
+**Modificar**: `server/mcp/routes.ts` queda como adaptador fino que monta `createWcmHandler` con `auth` (`findApiToken`,
+`touchApiToken`, `openScope`) y `audit` (tabla `activity`, `via=mcp`).
 
-**Verificación**: `bun test server/mcp` sigue pasando sin cambios en los tests.
+**Verificación**: `bun test` sin cambiar aserciones de `codemode.test.ts`, `codemode.auth.test.ts`, `isolation.test.ts`.
 
-### Task 2.2 — Escribir el registry de checklist (3 h)
+### Task 2.2 — Alinear el registry al SPEC (1 h 30)
 
-**Crear**: `mychecklist/services/registry.ts`
-Todas las operaciones de listas e items (`lists.list/get/create`, `items.list/create/update/delete/search`), cada una llamando a `server/services/*` existente, con scope y `OpError`. No se duplica lógica.
+**Modificar**: `server/services/registry.ts` — `name`→`id` (`checklist.<recurso>.<verbo>`), `mode`→`scope`; las ops con
+verbo fuera del conjunto base (`rename`, `setDone`, `updateText`, `backlinks`) llevan `verbException`. El host expone
+`codemode.checklist.*` y el alias `checklist.*` durante una minor. `spec.version` pasa a `"1.0.0"`.
 
-**Verificación**: `bun run check` genera `spec.json` y `spec.d.ts`; el archivo commiteado.
+**Verificación**: `wcm check` en verde con `spec.json` y `checklist.d.ts` regenerados y commiteados.
 
-### Task 2.3 — Montar `/codemode/*` y `/mcp` (2 h)
+### Task 2.3 — Scope y auditoría (30 min)
 
-**Modificar**: `mychecklist/server/app.ts` — montar `createWcmHandler` con `api_tokens` (sha256), auditoría en la tabla `activity` con `via=mcp`.
+Token `read` contra `items.create` → `FORBIDDEN`; la corrida deja fila con `error_code=FORBIDDEN`.
 
-**Verificación**: `curl -X POST :4161/codemode/execute -H "Authorization: Bearer $T" -d '{"code":"async()=>{const l=await codemode.checklist.lists.create({title:\"x\"});const its=await Promise.all([1,2,3].map(i=>codemode.checklist.items.create({listId:l.id,title:\"i\"+i})));return its.length}"}'` → `{"ok":true,"result":"3","calls":4}`.
+### Task 2.4 — Merge (no se deploya a mano)
 
-### Task 2.4 — Test de scope y de auditoría (1 h)
+Branch `feat/wcm-toolkit`, PR, CI verde, revisión. El deploy corre por el workflow del repo.
 
-Token `checklist:read` contra `items.create` → `FORBIDDEN`; la corrida deja fila con `error_code=FORBIDDEN`.
-
-### Task 2.5 — Merge (30 min)
-
-Branch `feat/codemode`, PR, CI verde, revisión. **No se deploya desde acá**: el deploy corre por el workflow del repo.
-
-**Criterio de salida de fase**: checklist cumple el Definition of Done completo de SPEC §12.
+**Criterio de salida de fase**: mychecklist cumple el Definition of Done completo de SPEC §12.
 
 ---
 
@@ -144,11 +143,11 @@ Tests que exporta: `runConformance({ baseUrl, token })` verifica
 9. `spec.version` presente y parseable;
 10. dos llamadas en un `execute` hacen `calls=2`.
 
-**Verificación**: corre verde contra `mychecklist` y rojo contra el `wegraph` actual (que aún publica 24 tools).
+**Verificación**: corre verde contra `mychecklist` y rojo contra el `wegraph` actual (que aún publica 23 tools).
 
 ---
 
-## Fase 4 — `mcp.wefaber.net`: wegraf de 24 tools a 2 (6 h) [P0]
+## Fase 4 — `mcp.wefaber.net`: wegraf de 23 tools a 2 (6 h) [P0]
 
 ### Task 4.1 — Mudar el worker a `wegraph.wefaber.net` (1 h)
 
@@ -159,9 +158,9 @@ Tests que exporta: `runConformance({ baseUrl, token })` verifica
 ### Task 4.2 — Registry de wegraf (3 h)
 
 **Crear**: `wegraph/server/core/registry.ts`
-Las 24 tools de `server/core/mcp.ts` se reescriben como ops. Se agrupan por recurso: `wegraph.org.*`, `wegraph.graph.*`, `wegraph.docs.*`, `wegraph.eval.*`, `wegraph.scaffold.*`, `wegraph.telemetry.*`. Los handlers siguen llamando a `svc.*` (no se reescribe la lógica). Las ops con efecto (`propose_update`, `confirm_update`, `publish_doc`, `scaffold_project`) mantienen su par propose/confirm y declaran `wegraph:write`.
+Las 23 tools de `server/core/mcp.ts` se reescriben como ops. Se agrupan por recurso: `wegraph.org.*`, `wegraph.graph.*`, `wegraph.docs.*`, `wegraph.eval.*`, `wegraph.scaffold.*`, `wegraph.telemetry.*`. Los handlers siguen llamando a `svc.*` (no se reescribe la lógica). Las ops con efecto (`propose_update`, `confirm_update`, `publish_doc`, `scaffold_project`) mantienen su par propose/confirm y declaran `wegraph:write`.
 
-**Verificación**: `bun run gen` produce spec con 24 ops y 0 duplicados.
+**Verificación**: `bun run gen` produce spec con 23 ops y 0 duplicados.
 
 ### Task 4.3 — Reemplazar el handler MCP (1 h)
 
@@ -194,7 +193,7 @@ Los `spec.json` de cada producto se publican en el catálogo (tabla SQLite propi
 
 ### Task 5.3 — Router `execute` (2 h 30)
 
-Prefijo `codemode.<producto>.*` → fetch a `<url>/codemode/execute` con identidad firmada HMAC (`x-wcm-token-hash`, `x-wcm-scopes`, `x-wcm-via: gateway`). Presupuesto global por token en D1. Producto caído → `PRODUCT_UNAVAILABLE`.
+Prefijo `codemode.<producto>.*` → fetch a `<url>/codemode/execute` con identidad firmada HMAC (`x-wcm-token-hash`, `x-wcm-scopes`, `x-wcm-via: gateway`). Presupuesto global por token en SQLite del gateway (el gateway vive en el VPS, SPEC §8). Producto caído → `PRODUCT_UNAVAILABLE`.
 
 **Verificación**: un `execute` que toca dos productos distintos en la misma corrida devuelve el resultado combinado, y cada producto ve su `run_id` en la auditoría.
 
@@ -235,7 +234,7 @@ Prefijo `codemode.<producto>.*` → fetch a `<url>/codemode/execute` con identid
 `jobit`, `mercuria`, `lux`, `cdn-panel`, `wepanel`, `files`. No tienen MCP: tienen REST o GraphQL. Para estos, el patrón es **search + execute sobre OpenAPI** sin escribir registry a mano:
 
 1. Exportar el OpenAPI del producto (Elysia lo genera; GraphQL queda fuera por ahora).
-2. `openApiMcpServer()` (adaptador `workers`) o el `spec` derivado del OpenAPI en `quickjs`.
+2. `spec` derivado del OpenAPI, corriendo en el adaptador `quickjs` (D2: los productos del VPS no usan Workers).
 3. Scope por grupo de rutas, auth por token del producto.
 4. Conformance.
 
