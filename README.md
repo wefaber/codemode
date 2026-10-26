@@ -44,12 +44,12 @@ tests/conformance/        @wefaber/codemode-conformance
 
 ## Packages
 
-| Package | What |
-|---|---|
-| `@wefaber/codemode` | `defineOp`, `createRegistry`, spec and `client.d.ts` generator, sandbox contract, `wcm gen\|check` |
-| `@wefaber/codemode-sandbox-quickjs` | `quickjs` adapter: QuickJS wasm in a terminable Bun Worker |
-| `@wefaber/codemode-mcp` | `createWcmHandler`: `/codemode/search`, `/codemode/execute`, `/mcp` as one Web `Request` handler, limiter, audit hook |
-| `@wefaber/codemode-cli` | stdio MCP bridge to a product's or the gateway's `/codemode/*` |
+| Package                             | What                                                                                                                  |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `@wefaber/codemode`                 | `defineOp`, `createRegistry`, spec and `client.d.ts` generator, sandbox contract, `wcm gen\|check`                    |
+| `@wefaber/codemode-sandbox-quickjs` | `quickjs` adapter: QuickJS wasm in a terminable Bun Worker                                                            |
+| `@wefaber/codemode-mcp`             | `createWcmHandler`: `/codemode/search`, `/codemode/execute`, `/mcp` as one Web `Request` handler, limiter, audit hook |
+| `@wefaber/codemode-cli`             | stdio MCP bridge to a product's or the gateway's `/codemode/*`                                                        |
 
 ```ts
 const handler = createWcmHandler({
