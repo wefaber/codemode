@@ -28,9 +28,9 @@ Repo nuevo: `wefaber/codemode` (privado, Bun + TypeScript).
 
 ```
 packages/core/src/{registry,spec,errors,limits,run}.ts
-packages/sandbox-quickjs/src/{sandbox,worker}.ts
+packages/sandbox-quickjs/src/{qjs,worker,exec,sandbox}.ts
 packages/sandbox-quickjs-wasm/src/sandbox.ts   # se implementa en Fase 4 (wegraf)
-packages/mcp/src/{handler,search,execute}.ts
+packages/mcp/src/{handler,protocol,run,limiter}.ts   # el limiter vive acá: es del transporte, no del sandbox
 packages/cli/src/index.ts
 tests/conformance/
 docs/SPEC.md
