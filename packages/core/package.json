@@ -1,9 +1,20 @@
 {
-  "name": "@wefaber/codemode-core",
-  "version": "0.1.0",
+  "name": "@wefaber/codemode",
+  "version": "0.3.0",
+  "description": "WeFaber Code Mode core: defineOp registry, spec and d.ts generator, sandbox contract",
+  "license": "MIT",
   "type": "module",
   "main": "src/index.ts",
   "exports": {
     ".": "./src/index.ts"
+  },
+  "bin": {
+    "wcm": "./src/bin.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.52"
   }
 }

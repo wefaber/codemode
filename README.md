@@ -2,7 +2,7 @@
 
 Shared toolkit for exposing WeFaber products to AI agents through **Code Mode**: the client sees at most two MCP tools (`search`, `execute`), and the model writes JavaScript that calls a typed product API inside a sandbox.
 
-Status: **specification** (v0.2, 2026-10-26). Packages land in `packages/*` per `docs/PLAN.md` phase 1.
+Status: **v0.3.0**. Standard v0.2 (`docs/SPEC.md`) and the phase 1 packages (`docs/PLAN.md`).
 
 ## Why
 
@@ -41,3 +41,24 @@ tests/conformance/        @wefaber/codemode-conformance
 ## Migration order
 
 `mychecklist` (reference implementation) → `wegraph` (24 tools to 2) → gateway on `mcp.wefaber.net` → `kit`, `ohmydocs`, `ohmydiagrams` → VPS products (`jobit`, `mercuria`, `lux`, `cdn-panel`, `wefiles`).
+
+## Packages
+
+| Package                             | What                                                                                                                  |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `@wefaber/codemode`                 | `defineOp`, `createRegistry`, spec and `client.d.ts` generator, sandbox contract, `wcm gen\|check`                    |
+| `@wefaber/codemode-sandbox-quickjs` | `quickjs` adapter: QuickJS wasm in a terminable Bun Worker                                                            |
+| `@wefaber/codemode-mcp`             | `createWcmHandler`: `/codemode/search`, `/codemode/execute`, `/mcp` as one Web `Request` handler, limiter, audit hook |
+| `@wefaber/codemode-cli`             | stdio MCP bridge to a product's or the gateway's `/codemode/*`                                                        |
+
+```ts
+const handler = createWcmHandler({
+  registry, // createRegistry({ product, version, ops })
+  sandbox: createQuickJsSandbox(),
+  auth: (req) => ({ tokenId, scopes: ['todo:write'], ctx }), // or null -> 401, or a Response
+  audit: (row) => db.insert(row),
+})
+// Elysia: .all('/mcp', ({ request }) => handler(request)); Bun.serve: fetch: handler
+```
+
+Tests that arbitrate the standard live in `tests/conformance/` (escape, limits, scope, audit).

@@ -1,0 +1,22 @@
+{
+  "name": "@wefaber/codemode-cli",
+  "version": "0.3.0",
+  "description": "stdio MCP bridge for WeFaber Code Mode: forwards search and execute to /codemode/*",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "bin": {
+    "codemode-cli": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "!src/**/*.test.ts"
+  ],
+  "dependencies": {
+    "@wefaber/codemode": "workspace:*",
+    "@wefaber/codemode-mcp": "workspace:*"
+  }
+}
