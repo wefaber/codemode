@@ -2,7 +2,7 @@
 
 Shared toolkit for exposing WeFaber products to AI agents through **Code Mode**: the client sees at most two MCP tools (`search`, `execute`), and the model writes JavaScript that calls a typed product API inside a sandbox.
 
-Status: **specification** (v0.1, 2026-10-26). No packages implemented yet.
+Status: **specification** (v0.2, 2026-10-26). Packages land in `packages/*` per `docs/PLAN.md` phase 1.
 
 ## Why
 
