@@ -81,12 +81,23 @@ for (const dir of dirs) {
     console.log(`skip ${spec} (already published)`)
     continue
   }
-  // A package that was never published answers 404: that is the case this script exists for.
-  const unpublished = info.code !== 0
-  if (unpublished && !/E404|404 Not Found/i.test(info.text)) {
+  // `name@version` answers 404 both for a package never published and for a new version of an existing one, so a
+  // 404 only means "unpublished" once the bare name also answers 404. Mistaking the second case for the first
+  // skipped every release after the first.
+  if (info.code !== 0 && !/E404|404 Not Found/i.test(info.text)) {
     console.error(`cannot check ${spec}: ${info.text}`)
     failed = true
     continue
+  }
+  let unpublished = false
+  if (info.code !== 0) {
+    const exists = await run(['npm', 'view', name, 'name'], dir)
+    if (exists.code !== 0 && !/E404|404 Not Found/i.test(exists.text)) {
+      console.error(`cannot check ${name}: ${exists.text}`)
+      failed = true
+      continue
+    }
+    unpublished = exists.code !== 0
   }
   // Without a token the only credential is the OIDC one, and the exchange is keyed by an existing package, so a
   // never-published package is a first release that must happen by hand. Skip it, loudly, and keep the run honest.
