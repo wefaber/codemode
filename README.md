@@ -2,7 +2,7 @@
 
 Shared toolkit for exposing WeFaber products to AI agents through **Code Mode**: the client sees at most two MCP tools (`search`, `execute`), and the model writes JavaScript that calls a typed product API inside a sandbox.
 
-Status: **v0.3.0**. Standard v0.2 (`docs/SPEC.md`) and the phase 1 packages (`docs/PLAN.md`).
+Status: **v0.3.1**. Standard v0.2 (`docs/SPEC.md`) and the phase 1 packages (`docs/PLAN.md`).
 
 ## Why
 
@@ -62,3 +62,7 @@ const handler = createWcmHandler({
 ```
 
 Tests that arbitrate the standard live in `tests/conformance/` (escape, limits, scope, audit).
+
+## License
+
+[MIT](./LICENSE) © WeFaber.

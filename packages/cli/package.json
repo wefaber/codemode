@@ -1,6 +1,6 @@
 {
   "name": "@wefaber/codemode-cli",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "stdio MCP bridge for WeFaber Code Mode: forwards search and execute to /codemode/*",
   "license": "MIT",
   "type": "module",
