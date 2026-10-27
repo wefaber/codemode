@@ -3,8 +3,16 @@
 // CI (.github/workflows/publish.yml) publishes with npm Trusted Publishing: OIDC, no token. Bun packs the tarball
 // (it resolves `workspace:*`), npm publishes it, because `bun publish` has no OIDC support.
 // First release of a new package: Trusted Publishing needs the package to exist, so run `bun run release` once from a
-// logged-in shell (`npm login`); npm asks for the 2FA code on the terminal.
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
+// logged-in shell (`npm login`); npm asks for the 2FA code on the terminal. In CI, where the only credential is the
+// OIDC token, such a package is reported and skipped instead of failing the run: the token exchange answers 404
+// "package not found" and npm turns that into a bare ENEEDAUTH, which no retry or code change can fix.
+import {
+  appendFileSync,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -13,6 +21,11 @@ const dirs = readdirSync(join(root, 'packages'))
   .map((d) => join(root, 'packages', d))
   .filter((d) => existsSync(join(d, 'package.json')))
 const interactive = !process.env.CI
+// A real publish token can only come from the environment here; without one, CI has just the OIDC token, which
+// only works for packages that already exist on the registry.
+const hasPublishToken = Boolean(
+  process.env.NODE_AUTH_TOKEN || process.env.NPM_TOKEN,
+)
 
 const run = async (cmd: string[], cwd: string, inherit = false) => {
   if (inherit) {
@@ -39,6 +52,7 @@ const run = async (cmd: string[], cwd: string, inherit = false) => {
 }
 
 let failed = false
+const needsBootstrap: string[] = []
 // Dependency order: core first, then what depends on it.
 const order = ['core', 'sandbox-quickjs', 'mcp', 'cli']
 dirs.sort(
@@ -68,9 +82,16 @@ for (const dir of dirs) {
     continue
   }
   // A package that was never published answers 404: that is the case this script exists for.
-  if (info.code !== 0 && !/E404|404 Not Found/i.test(info.text)) {
+  const unpublished = info.code !== 0
+  if (unpublished && !/E404|404 Not Found/i.test(info.text)) {
     console.error(`cannot check ${spec}: ${info.text}`)
     failed = true
+    continue
+  }
+  // Without a token the only credential is the OIDC one, and the exchange is keyed by an existing package, so a
+  // never-published package is a first release that must happen by hand. Skip it, loudly, and keep the run honest.
+  if (unpublished && !interactive && !hasPublishToken) {
+    needsBootstrap.push(spec)
     continue
   }
   const out = mkdtempSync(join(tmpdir(), 'wefaber-pack-'))
@@ -95,5 +116,23 @@ for (const dir of dirs) {
   } finally {
     rmSync(out, { recursive: true, force: true })
   }
+}
+if (needsBootstrap.length > 0) {
+  for (const spec of needsBootstrap)
+    console.log(
+      `::warning title=Not on npm yet::${spec} has never been published and Trusted Publishing cannot create a new package. Bootstrap it once from a logged-in shell: npm login && bun run release`,
+    )
+  const summary = [
+    '### Release skipped: a first publish needs a manual bootstrap',
+    '',
+    'Trusted Publishing (OIDC) cannot create a package that is not on the registry yet, so these were skipped:',
+    '',
+    ...needsBootstrap.map((spec) => `- \`${spec}\``),
+    '',
+    'Run `npm login && bun run release` once from a clean checkout. Later versions publish from this workflow.',
+    '',
+  ]
+  const summaryFile = process.env.GITHUB_STEP_SUMMARY
+  if (summaryFile) appendFileSync(summaryFile, summary.join('\n'))
 }
 process.exit(failed ? 1 : 0)
