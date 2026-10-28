@@ -120,9 +120,17 @@ for (const dir of dirs) {
       throw new Error(pub.text || `npm publish exited ${pub.code}`)
     console.log(`published ${spec}`)
   } catch (error) {
-    console.error(
-      `FAILED ${spec}\n${error instanceof Error ? error.message : error}`,
-    )
+    const text = error instanceof Error ? error.message : String(error)
+    console.error(`FAILED ${spec}\n${text}`)
+    // The exchange answers 404 "package not found" when npmjs.com holds no trusted publisher for this package that
+    // matches this repository and this workflow file, or when its "Allow npm publish" permission is off. The OIDC
+    // token can never be exchanged then, and npm reports the whole thing as a bare ENEEDAUTH.
+    if (/OIDC token exchange error.*package not found/i.test(text))
+      console.error(
+        `HINT ${spec}: trusted publisher missing or incomplete on npmjs.com. It needs repository ` +
+          `wefaber/codemode, workflow publish.yml and "Allow npm publish" enabled: ` +
+          `https://www.npmjs.com/package/${name}/access`,
+      )
     failed = true
   } finally {
     rmSync(out, { recursive: true, force: true })

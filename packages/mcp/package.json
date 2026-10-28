@@ -3,6 +3,11 @@
   "version": "0.3.1",
   "description": "WeFaber Code Mode transports: /codemode/search, /codemode/execute and /mcp (search + execute) as one Web handler",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wefaber/codemode.git",
+    "directory": "packages/mcp"
+  },
   "type": "module",
   "main": "src/index.ts",
   "exports": {
