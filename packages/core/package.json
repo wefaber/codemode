@@ -3,6 +3,11 @@
   "version": "0.3.1",
   "description": "WeFaber Code Mode core: defineOp registry, spec and d.ts generator, sandbox contract",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wefaber/codemode.git",
+    "directory": "packages/core"
+  },
   "type": "module",
   "main": "src/index.ts",
   "exports": {

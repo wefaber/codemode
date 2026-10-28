@@ -3,6 +3,11 @@
   "version": "0.3.1",
   "description": "stdio MCP bridge for WeFaber Code Mode: forwards search and execute to /codemode/*",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wefaber/codemode.git",
+    "directory": "packages/cli"
+  },
   "type": "module",
   "main": "src/index.ts",
   "exports": {
