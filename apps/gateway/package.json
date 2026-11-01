@@ -1,0 +1,16 @@
+{
+  "name": "@wefaber/codemode-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WeFaber Code Mode gateway (mcp.wefaber.net): search over the catalog, execute routed to each product",
+  "type": "module",
+  "scripts": {
+    "start": "bun src/index.ts",
+    "admin": "bun src/cli.ts"
+  },
+  "dependencies": {
+    "@wefaber/codemode": "workspace:*",
+    "@wefaber/codemode-mcp": "workspace:*",
+    "@wefaber/codemode-sandbox-quickjs": "workspace:*"
+  }
+}

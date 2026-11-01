@@ -16,9 +16,18 @@
         "typescript": "~6.0.2",
       },
     },
+    "apps/gateway": {
+      "name": "@wefaber/codemode-gateway",
+      "version": "0.1.0",
+      "dependencies": {
+        "@wefaber/codemode": "workspace:*",
+        "@wefaber/codemode-mcp": "workspace:*",
+        "@wefaber/codemode-sandbox-quickjs": "workspace:*",
+      },
+    },
     "packages/cli": {
       "name": "@wefaber/codemode-cli",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "bin": {
         "codemode-cli": "./src/index.ts",
       },
@@ -29,7 +38,7 @@
     },
     "packages/core": {
       "name": "@wefaber/codemode",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "bin": {
         "wcm": "./src/bin.ts",
       },
@@ -39,14 +48,14 @@
     },
     "packages/mcp": {
       "name": "@wefaber/codemode-mcp",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "dependencies": {
         "@wefaber/codemode": "workspace:*",
       },
     },
     "packages/sandbox-quickjs": {
       "name": "@wefaber/codemode-sandbox-quickjs",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "dependencies": {
         "@wefaber/codemode": "workspace:*",
         "quickjs-emscripten": "^0.32.0",
@@ -149,6 +158,8 @@
     "@wefaber/codemode": ["@wefaber/codemode@workspace:packages/core"],
 
     "@wefaber/codemode-cli": ["@wefaber/codemode-cli@workspace:packages/cli"],
+
+    "@wefaber/codemode-gateway": ["@wefaber/codemode-gateway@workspace:apps/gateway"],
 
     "@wefaber/codemode-mcp": ["@wefaber/codemode-mcp@workspace:packages/mcp"],
 
