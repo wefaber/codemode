@@ -33,6 +33,16 @@ declare const self: {
   postMessage(message: WorkerOut): void
 }
 
+/** A failed host call, with the code the host gave it. The message keeps the `CODE: ` prefix for code that parses it. */
+class HostError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(`${code}: ${message}`)
+  }
+}
+
 const waiting = new Map<
   number,
   { resolve(value: unknown): void; reject(error: Error): void }
@@ -68,7 +78,7 @@ self.onmessage = (event) => {
     if (!entry) return
     waiting.delete(msg.id)
     if (msg.ok) entry.resolve(msg.value)
-    else entry.reject(new Error(`${msg.code}: ${msg.message}`))
+    else entry.reject(new HostError(msg.code, msg.message))
     return
   }
   void runSandboxed(msg.code, hostApi(msg.ops), msg.limits, {
