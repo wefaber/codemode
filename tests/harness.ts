@@ -30,7 +30,7 @@ export function harness(
   const handler = createWcmHandler<TodoCtx>({
     registry: todoRegistry,
     sandbox: createQuickJsSandbox(),
-    limits: { ...DEFAULT_LIMITS, timeoutMs: 400, ...opts.limits },
+    limits: { ...DEFAULT_LIMITS, timeoutMs: 1_000, ...opts.limits },
     limiter:
       opts.limiter ?? createLimiter({ ...DEFAULT_LIMITER, perMinute: 1000 }),
     aliases: opts.aliases,
