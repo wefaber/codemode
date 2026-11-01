@@ -1,0 +1,25 @@
+[Unit]
+Description=WeFaber Code Mode gateway (mcp.wefaber.net) slot %i
+Documentation=https://github.com/wefaber/codemode/tree/main/apps/gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hermes
+# %i is the slot (blue|green); /srv/codemode/current points at the live one.
+WorkingDirectory=/srv/codemode/%i
+# Shared secret + DB path first, then the per-slot PORT (later file wins).
+EnvironmentFile=/home/hermes/deploy/env/codemode-gateway.env
+EnvironmentFile=-/home/hermes/deploy/env/codemode-gateway-%i.env
+ExecStart=/opt/bun/bun /srv/codemode/%i/apps/gateway/src/index.ts
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ReadWritePaths=/srv/codemode/data
+
+[Install]
+WantedBy=multi-user.target
