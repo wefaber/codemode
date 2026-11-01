@@ -27,7 +27,7 @@ Each call `await codemode.todo.items.create({ ... })` becomes one `POST <product
 - A product that is down, slow (over `WCM_PRODUCT_TIMEOUT_MS`) or answering 5xx → `PRODUCT_UNAVAILABLE`; the gateway and the other products keep serving.
 - A product that announces another major in `x-wcm-spec-version` than the catalog knows → `SPEC_MISMATCH` (R8).
 - A product that rejects the signed identity → `HOST_ERROR` to the agent, the cause only in the server log.
-- Domain errors of the product (`NOT_FOUND`, `VALIDATION`, `FORBIDDEN`...) reach the code as an `Error` whose message carries the code; uncaught, the run is `CODE_ERROR` with that message. This is the sandbox contract, same as for a product on its own.
+- Errors of the product (`NOT_FOUND`, `VALIDATION`, `FORBIDDEN`...) keep their code: the code can branch on `e.code`, and uncaught, the run fails with that same code (SPEC R12), so an agent can tell the user what went wrong. `CODE_ERROR` is only for mistakes in the agent's own code.
 - A product result that the product truncated is `LIMIT_REACHED`: ask for less.
 
 ### Identity a product receives

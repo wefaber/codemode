@@ -4,7 +4,9 @@ import {
   type QuickJSHandle,
 } from 'quickjs-emscripten'
 import {
+  codeOf,
   DEFAULT_LIMITS,
+  WCM_ERROR_CODES,
   type HostApi,
   type Limits,
   type RunResult,
@@ -28,6 +30,15 @@ export type RunOptions = {
   data?: Record<string, unknown>
   /** Extra globals that point into the host API: `{ checklist: 'codemode.checklist' }`. */
   aliases?: Record<string, string>
+}
+
+const KNOWN_CODES = new Set<string>(WCM_ERROR_CODES)
+
+/** The code a failed host call carries: a listed one as is, any other string code is a generic `HOST_ERROR`. */
+function hostCode(err: unknown): SandboxErrorCode | undefined {
+  const code = codeOf(err)
+  if (code === undefined) return undefined
+  return KNOWN_CODES.has(code) ? (code as SandboxErrorCode) : 'HOST_ERROR'
 }
 
 class LimitError extends Error {
@@ -94,6 +105,9 @@ export async function runSandboxed(
   // Every handle the run creates; QuickJS aborts on dispose if any is still alive.
   const owned: { alive: boolean; dispose(): void }[] = []
   let closed = false
+  // Codes of the host calls that failed, by the message the code saw. Only these are trusted when the run fails:
+  // an agent that builds `{ code: 'FORBIDDEN' }` itself must not be able to pass for a host failure.
+  const hostCodes = new Map<string, SandboxErrorCode>()
   const ms = () => Math.round(performance.now() - started)
 
   try {
@@ -131,9 +145,16 @@ export async function runSandboxed(
             const args = argHandles.map((h) => vm.dump(h))
             const deferred = vm.newPromise()
             owned.push(deferred)
-            // A real `Error` (with `message`), not bare text: it is what the agent's code expects to catch.
-            const rejectWith = (message: string) => {
+            // A real `Error` (with `message` and, for a host failure, `code`), not bare text: it is what the
+            // agent's code expects to catch.
+            const rejectWith = (message: string, code?: SandboxErrorCode) => {
               const error = vm.newError(message)
+              if (code) {
+                const text = vm.newString(code)
+                vm.setProp(error, 'code', text)
+                text.dispose()
+                hostCodes.set(message, code)
+              }
               deferred.reject(error)
               error.dispose()
             }
@@ -153,7 +174,7 @@ export async function runSandboxed(
               .catch((err: unknown) => {
                 if (closed) return
                 const message = err instanceof Error ? err.message : String(err)
-                rejectWith(message)
+                rejectWith(message, hostCode(err))
               })
               .finally(() => {
                 pending.delete(work)
@@ -260,8 +281,18 @@ export async function runSandboxed(
     }
     if (state.type === 'rejected') {
       const err = vm.dump(state.error)
+      const message = String(err?.message ?? err)
+      // The code of an uncaught host failure is the run's code; anything else the code threw is a CODE_ERROR.
+      let code: SandboxErrorCode = 'CODE_ERROR'
+      const claimed = hostCodes.get(message)
+      if (claimed && typeof err === 'object' && err !== null) {
+        const prop = vm.getProp(state.error, 'code')
+        if (vm.typeof(prop) === 'string' && vm.getString(prop) === claimed)
+          code = claimed
+        prop.dispose()
+      }
       state.error.dispose()
-      return fail('CODE_ERROR', String(err?.message ?? err))
+      return fail(code, message)
     }
     const text = dumpJson(vm, state.value)
     state.value.dispose()

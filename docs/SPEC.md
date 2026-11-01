@@ -75,7 +75,7 @@ RFC 2119: **DEBE** = obligatorio, **DEBERÍA** = default con excepción justific
 
 **R11 — Generación verificable.** `spec.json` y `client.d.ts` se generan del registry. `bun run check` falla si están desactualizados. Un spec editado a mano es un bug de CI, no un atajo.
 
-**R12 — Errores con código, sin stack.** `TIMEOUT`, `TOO_MANY_CALLS`, `CODE_ERROR`, `HOST_ERROR`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION`, `RATE_LIMITED`, `LIMIT_REACHED` (cuerpo demasiado grande, HTTP 413), `UNAUTHENTICATED` (HTTP 401), `PRODUCT_UNAVAILABLE`, `SPEC_MISMATCH` (la lista canónica es `WCM_ERROR_CODES` en `@wefaber/codemode`). El modelo recibe el código y un mensaje accionable; el stack queda en el log del servidor.
+**R12 — Errores con código, sin stack.** `TIMEOUT`, `TOO_MANY_CALLS`, `CODE_ERROR`, `HOST_ERROR`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION`, `RATE_LIMITED`, `LIMIT_REACHED` (cuerpo demasiado grande, HTTP 413), `UNAUTHENTICATED` (HTTP 401), `PRODUCT_UNAVAILABLE`, `SPEC_MISMATCH` (la lista canónica es `WCM_ERROR_CODES` en `@wefaber/codemode`). El modelo recibe el código y un mensaje accionable; el stack queda en el log del servidor. Si el código del agente deja fallar una llamada al host, la corrida informa el código de esa llamada (`NOT_FOUND`, `PRODUCT_UNAVAILABLE`…) y el error que el código atrapa lleva `e.code`, para que el agente pueda diagnosticar con el usuario; un código que no está en la lista llega como `HOST_ERROR`. `CODE_ERROR` queda para errores del propio código del agente.
 
 ---
 

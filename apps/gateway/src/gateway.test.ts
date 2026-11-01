@@ -118,10 +118,10 @@ type Body = {
   error?: { code: string; message: string }
 }
 
-/** Domain errors cross the sandbox as an Error whose message carries the code; uncaught, the run is CODE_ERROR. */
+/** An uncaught host failure is reported with its own code, so an agent can tell the cases apart (SPEC R12). */
 const failedWith = (body: Body, code: string) => {
   expect(body.ok).toBe(false)
-  expect(body.error?.code).toBe('CODE_ERROR')
+  expect(body.error?.code).toBe(code)
   expect(body.error?.message).toContain(code)
 }
 
@@ -370,7 +370,7 @@ describe('gateway: execute', () => {
     const rows = w.db
       .query('SELECT error_code FROM runs ORDER BY created_at')
       .all() as { error_code: string }[]
-    expect(rows.map((r) => r.error_code)).toEqual(['CODE_ERROR', 'CODE_ERROR'])
+    expect(rows.map((r) => r.error_code)).toEqual(['NOT_FOUND', 'VALIDATION'])
   })
 
   test('a product that is down is PRODUCT_UNAVAILABLE and the others keep working', async () => {
@@ -390,7 +390,7 @@ describe('gateway: execute', () => {
       w.rw,
       `
       let notes = 'unavailable'
-      try { notes = await codemode.note.notes.list({}) } catch (e) { notes = e.message.split(':')[0] }
+      try { notes = await codemode.note.notes.list({}) } catch (e) { notes = e.code }
       const items = await codemode.todo.items.list({})
       return { notes, todos: items.length }
       `,
