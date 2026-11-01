@@ -11,6 +11,8 @@ import {
   createLimiter,
   createWcmHandler,
   DEFAULT_LIMITER,
+  verifyIdentity,
+  type Identity,
 } from '@wefaber/codemode-mcp'
 import { createQuickJsSandbox } from '@wefaber/codemode-sandbox-quickjs'
 import { todoRegistry, type TodoCtx } from '../../../tests/fixtures/todo.ts'
@@ -18,7 +20,6 @@ import { parseSpec } from './catalog.ts'
 import type { GatewayConfig } from './config.ts'
 import { openDb } from './db.ts'
 import { createGateway } from './gateway.ts'
-import { verifyIdentity, type Identity } from './identity.ts'
 
 const SECRET = 'g'.repeat(40)
 
@@ -107,6 +108,7 @@ const baseConfig: GatewayConfig = {
   runTimeoutMs: 8_000,
   productTimeoutMs: 3_000,
   perMinute: 1_000,
+  callsPerMinute: 100_000,
   maxBytesPerDay: 1_000_000,
 }
 

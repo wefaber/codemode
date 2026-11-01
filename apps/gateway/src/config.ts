@@ -10,6 +10,8 @@ export type GatewayConfig = {
   productTimeoutMs: number
   /** Runs per minute per token. */
   perMinute: number
+  /** Calls to products per minute per token, across all its runs (SPEC §8). */
+  callsPerMinute: number
   /** Result bytes per day per token (SPEC §8: global budget at the gateway). */
   maxBytesPerDay: number
 }
@@ -40,6 +42,7 @@ export function loadConfig(env: Env = process.env): GatewayConfig {
     runTimeoutMs: int(env, 'WCM_RUN_TIMEOUT_MS', 15_000),
     productTimeoutMs: int(env, 'WCM_PRODUCT_TIMEOUT_MS', 10_000),
     perMinute: int(env, 'WCM_RUNS_PER_MINUTE', 60),
+    callsPerMinute: int(env, 'WCM_CALLS_PER_MINUTE', 600),
     maxBytesPerDay: int(env, 'WCM_MAX_BYTES_PER_DAY', 10 * 1024 * 1024),
   }
 }
