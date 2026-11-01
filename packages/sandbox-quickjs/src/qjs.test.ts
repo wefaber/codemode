@@ -113,3 +113,61 @@ describe('sandbox (QuickJS)', () => {
     expect(r.ms).toBeLessThan(500)
   })
 })
+
+describe('código del error del host', () => {
+  const failing = (code: string, message: string): HostApi => ({
+    boom: async () => {
+      throw Object.assign(new Error(message), { code })
+    },
+  })
+
+  test('un fallo del host sin atrapar se informa con su propio código', async () => {
+    const r = await runSandboxed(
+      'return await host.boom()',
+      failing('NOT_FOUND', 'No item 7'),
+    )
+    expect(r.ok).toBe(false)
+    if (!r.ok) {
+      expect(r.error.code).toBe('NOT_FOUND')
+      expect(r.error.message).toContain('No item 7')
+    }
+  })
+
+  test('el código atrapa el fallo con e.code', async () => {
+    const r = await runSandboxed(
+      'try { await host.boom() } catch (e) { return [e.code, e.message] }',
+      failing('PRODUCT_UNAVAILABLE', 'todo is down'),
+    )
+    expect(r).toMatchObject({
+      ok: true,
+      result: JSON.stringify(['PRODUCT_UNAVAILABLE', 'todo is down']),
+    })
+  })
+
+  test('un código fuera de la lista es HOST_ERROR, sin perder el texto original', async () => {
+    const r = await runSandboxed(
+      'return await host.boom()',
+      failing('ECONNRESET', 'socket hang up'),
+    )
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.error.code).toBe('HOST_ERROR')
+  })
+
+  test('el código del agente no puede hacerse pasar por un fallo del host', async () => {
+    for (const code of [
+      'throw Object.assign(new Error("x"), { code: "FORBIDDEN" })',
+      'throw Object.assign(new Error("NOT_FOUND: x"), { code: "NOT_FOUND" })',
+      'throw { code: "RATE_LIMITED", message: "y" }',
+    ]) {
+      const r = await runSandboxed(code, none)
+      expect(r.ok).toBe(false)
+      if (!r.ok) expect(r.error.code).toBe('CODE_ERROR')
+    }
+  })
+
+  test('un error propio sin código sigue siendo CODE_ERROR', async () => {
+    const r = await runSandboxed('throw new Error("mío")', none)
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.error.code).toBe('CODE_ERROR')
+  })
+})

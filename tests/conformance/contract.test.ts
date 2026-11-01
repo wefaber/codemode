@@ -97,7 +97,7 @@ describe('audit', () => {
     expect(ok!.runId).toMatch(/^[0-9a-f-]{36}$/)
     expect(domain).toMatchObject({
       ops: ['todo.items.get'],
-      errorCode: 'CODE_ERROR',
+      errorCode: 'NOT_FOUND',
     })
     expect(search).toMatchObject({ kind: 'search', tokenId: 't-read', ops: [] })
     expect(syntax!.errorCode).toBe('CODE_ERROR')
@@ -132,5 +132,39 @@ describe('aliases', () => {
     const r = await h.exec('write', 'return 1')
     expect(r.body.ok).toBe(false)
     expect(r.body.error.code).toBe('CODE_ERROR')
+  })
+})
+
+describe('error codes the agent can act on', () => {
+  test('an uncaught domain error is the run code, in the response and in the audit row', async () => {
+    const h = harness()
+    const notFound = await h.exec(
+      'write',
+      `return await codemode.todo.items.get({ id: 'nope' })`,
+    )
+    expect(notFound.body.error.code).toBe('NOT_FOUND')
+    expect(notFound.body.error.message).toContain('nope')
+    const invalid = await h.exec(
+      'write',
+      `return await codemode.todo.items.create({})`,
+    )
+    expect(invalid.body.error.code).toBe('VALIDATION')
+    expect(h.audit.map((a) => a.errorCode)).toEqual(['NOT_FOUND', 'VALIDATION'])
+  })
+
+  test('an internal failure is a generic HOST_ERROR that leaks nothing', async () => {
+    const h = harness()
+    const r = await h.exec('write', `return await codemode.todo.items.boom()`)
+    expect(r.body.error.code).toBe('HOST_ERROR')
+    expect(JSON.stringify(r.body)).not.toContain('secret stack detail')
+  })
+
+  test('the code can branch on e.code', async () => {
+    const h = harness()
+    const r = await h.exec(
+      'write',
+      `try { await codemode.todo.items.get({ id: 'nope' }) } catch (e) { return e.code }`,
+    )
+    expect(r.body.result).toBe('NOT_FOUND')
   })
 })

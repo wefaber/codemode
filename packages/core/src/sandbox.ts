@@ -1,14 +1,16 @@
+import type { WcmErrorCode } from './constants.ts'
 import type { Limits } from './limits.ts'
 
 export type HostFn = (...args: unknown[]) => Promise<unknown>
 /** Nested namespaces of host functions: `{ items: { create } }` becomes `host.items.create(...)` in the sandbox. */
 export type HostApi = { [name: string]: HostFn | HostApi }
 
-export type SandboxErrorCode =
-  | 'TIMEOUT'
-  | 'TOO_MANY_CALLS'
-  | 'CODE_ERROR'
-  | 'HOST_ERROR'
+/**
+ * Why a run failed (SPEC R12). `TIMEOUT`, `TOO_MANY_CALLS` and `CODE_ERROR` come from the sandbox itself; when
+ * the agent's code lets a host call fail, the run reports that call's own code (`NOT_FOUND`, `VALIDATION`,
+ * `PRODUCT_UNAVAILABLE`...), so the agent and the user can tell what went wrong without parsing a message.
+ */
+export type SandboxErrorCode = WcmErrorCode
 
 export type RunResult =
   | {
