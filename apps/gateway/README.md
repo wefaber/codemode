@@ -62,7 +62,36 @@ bun src/cli.ts token revoke <hash-prefix>
 
 ## Deploy
 
-Templates in [`deploy/`](deploy): the systemd unit and the Nginx vhost. The delivery path is the usual one (branch → PR → merge → self-hosted runner → blue/green on `/srv/codemode/current`), not a manual copy. Cutting `mcp.wefaber.net` over from wegraf (PLAN Task 5.4) needs the wegraf move to `wegraph.wefaber.net` first (D1) and is an infra step: DNS, certificate and the Nginx reload.
+On the VPS, blue/green, from `main` only: `.github/workflows/deploy-gateway.yml` runs
+[`deploy/deploy-gateway.sh`](deploy/deploy-gateway.sh) on the `vps-wefaber` self-hosted runner
+(push touching `apps/gateway/**` or `packages/**`, or `workflow_dispatch`). Nothing is copied by hand.
+
+```
+release  /srv/codemode/releases/<utc-stamp>-<sha>     one checkout + bun install per deploy
+slots    /srv/codemode/{blue,green} -> release        codemode-gateway@<slot>.service, PORT 4191/4192
+live     /srv/codemode/current      -> slot          what nginx proxies
+data     /srv/codemode/data/gateway.sqlite           shared by both slots
+env      ~/deploy/env/codemode-gateway.env           WCM_GATEWAY_SECRET + WCM_GATEWAY_DB (600, never in the repo)
+         ~/deploy/env/codemode-gateway-<slot>.env    PORT of that slot
+```
+
+The deploy starts the new release in the **idle** slot, requires `GET /health` **and** `GET /ready` to
+answer `200` with `ok:true` on that slot's loopback port, and only then repoints `current` and the
+nginx upstream (`/etc/nginx/sites-available/mcp.wefaber.net`, one `server` line) plus a reload. The
+slot that was live stays up, so a failure at any step is an automatic rollback — `current` back,
+upstream back, idle slot stopped, failed release deleted — with the failing slot's log in the run.
+`4171`/`4172`, the numbers this file used to name, are taken by tabula on this host, hence `4191`/`4192`.
+
+Rehearsal (no production): the script reads `CODEMODE_ROOT`, `CODEMODE_ENVDIR`, `CODEMODE_NGINX_CONF`,
+`CODEMODE_NGINX_ENABLED`, `CODEMODE_PUBLIC_URL` and `CODEMODE_SLOT_RUNNER=direct`, so a scratch root
+can exercise the whole flow — including a forced failure — before touching the VPS.
+
+`deploy/codemode-gateway@.service` and `deploy/nginx-mcp.wefaber.net.conf` are the templates; the
+script installs the unit if the host lacks it.
+
+**Cutting `mcp.wefaber.net` over** from the wegraph Worker (PLAN Task 5.4) needs the wegraf move to
+`wegraph.wefaber.net` first (D1): the vhost stays in `sites-available` — written and `nginx -t`-clean
+but not enabled — until that lands. Enabling it is a symlink into `sites-enabled` plus a reload.
 
 ## Budgets
 

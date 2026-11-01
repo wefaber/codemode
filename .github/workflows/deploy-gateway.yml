@@ -1,0 +1,58 @@
+name: Deploy gateway
+
+# Ships apps/gateway to the VPS and switches traffic blue/green.
+#
+# Public repo, so the runner is self-hosted only for this file: it runs on a push
+# to main (merged code), never on a pull request, and CI (GitHub-hosted) stays the
+# place where PR code executes. See ci.yml for that split.
+#
+# Host shape (provisioned once, not by this workflow):
+#   /srv/codemode/releases/<stamp>-<sha>   one full checkout per deploy
+#   /srv/codemode/{blue,green}             symlink -> release held by that slot
+#   /srv/codemode/current                  symlink -> the plainest slot (blue|green)
+#   /srv/codemode/data/gateway.sqlite      the SQLite database, shared by both slots
+#   ~/deploy/env/codemode-gateway.env      WCM_GATEWAY_SECRET + WCM_GATEWAY_DB (600)
+#   ~/deploy/env/codemode-gateway-<slot>.env  PORT of that slot (600)
+#   codemode-gateway@.service              template unit, installed below if missing
+#
+# Ports: blue 4191, green 4192. 4171, the default in apps/gateway/README.md, is
+# taken by tabula on this host, hence the override.
+#
+# The switch is two writes and a reload: /srv/codemode/current, and the `server`
+# line of the nginx upstream. Both happen only after the idle slot answers
+# /health AND /ready with 200, and the slot that was live until a second ago keeps
+# running, so rollback is repointing both back — no downtime, no restart.
+#
+# Nginx is not in the path yet: mcp.wefaber.net still answers from the wegraph
+# Worker (docs/DECISIONS.md D1). Until /etc/nginx/sites-enabled/mcp.wefaber.net
+# exists, this workflow deploys and switches the symlink but touches no vhost and
+# skips the public check.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/gateway/**'
+      - 'packages/**'
+      - '.github/workflows/deploy-gateway.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-codemode-gateway
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: deploy
+    runs-on: [self-hosted, vps-wefaber]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy (blue/green)
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+        run: bash "$GITHUB_WORKSPACE/apps/gateway/deploy/deploy-gateway.sh"
