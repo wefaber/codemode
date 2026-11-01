@@ -4,6 +4,7 @@ import {
   MAX_BODY_BYTES,
   MAX_CODE_CHARS,
   WCM_MCP_TOOLS,
+  OpError,
   type Sandbox,
   type WcmErrorCode,
   type WcmTool,
@@ -17,6 +18,7 @@ import {
   type RpcRequest,
   type ToolInfo,
 } from '@wefaber/codemode-mcp'
+import { createCallBudget } from './calls.ts'
 import { createCatalog } from './catalog.ts'
 import type { GatewayConfig } from './config.ts'
 import { buildHost, type ForwardDeps } from './forward.ts'
@@ -117,6 +119,7 @@ export function createGateway(deps: GatewayDeps) {
     { maxWorkers: 4, perMinute: config.perMinute },
     now,
   )
+  const callBudget = createCallBudget(db, config.callsPerMinute, now)
   const forward: ForwardDeps = {
     secret: config.secret,
     timeoutMs: config.productTimeoutMs,
@@ -222,6 +225,13 @@ export function createGateway(deps: GatewayDeps) {
             visible,
             {
               onCall: (id, product) => {
+                // Before anything else: a refused call is not in `ops` and never reaches the product.
+                if (!callBudget.take(principal.tokenId))
+                  throw new OpError(
+                    'RATE_LIMITED',
+                    `This token reached ${config.callsPerMinute} product calls per minute; ` +
+                      'retry in the next minute, or make fewer calls (filter inside the code, return only what you need)',
+                  )
                 ops.push(id)
                 const entry = catalog.get(product)
                 if (entry) touched.set(product, entry.version)

@@ -1,5 +1,11 @@
 export { createWcmHandler, type WcmHandlerOptions } from './handler.ts'
 export {
+  MAX_SKEW_MS,
+  signIdentity,
+  verifyIdentity,
+  type Identity,
+} from './identity.ts'
+export {
   createLimiter,
   DEFAULT_LIMITER,
   type Limiter,
