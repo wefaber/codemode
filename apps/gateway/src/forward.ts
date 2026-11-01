@@ -5,7 +5,7 @@ import {
   type WcmErrorCode,
 } from '@wefaber/codemode'
 import { majorOf, type ProductEntry } from './catalog.ts'
-import { signIdentity, type Identity } from './identity.ts'
+import { signIdentity, type Identity } from '@wefaber/codemode-mcp'
 
 export type ForwardDeps = {
   secret: string
@@ -108,6 +108,7 @@ export function buildHost(
   deps: ForwardDeps,
   caller: Caller,
   visible: readonly { product: ProductEntry; op: { id: string } }[],
+  /** `onCall` runs before each call and may throw (an `OpError`) to refuse it: the product is not contacted. */
   hooks: { onCall: (id: string, product: string) => void },
 ): HostApi {
   const api: HostApi = {}
