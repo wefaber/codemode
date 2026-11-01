@@ -6,7 +6,7 @@ The gateway of WeFaber Code Mode (`mcp.wefaber.net`, [SPEC §8](../../docs/SPEC.
 agent ──/mcp, /codemode/*──▶ gateway ──signed identity──▶ product /codemode/execute
                               │  search  → runs over the catalog (all visible ops, one flat list)
                               │  execute → codemode.<product>.<resource>.<verb>() is forwarded per call
-                              └─ SQLite: catalog, tokens (sha256), runs (audit), daily byte budget
+                              └─ SQLite: catalog, tokens (sha256), runs (audit), budgets (calls/minute, bytes/day)
 ```
 
 ## Routes
@@ -32,7 +32,7 @@ Each call `await codemode.todo.items.create({ ... })` becomes one `POST <product
 
 ### Identity a product receives
 
-`x-wcm-via: gateway`, `x-wcm-token-hash`, `x-wcm-scopes`, `x-wcm-agent`, `x-wcm-run-id` (the same for every call of one run, so the product ties its audit row to the gateway's), `x-wcm-timestamp` and `x-wcm-signature` (HMAC-SHA256 over those fields with `WCM_GATEWAY_SECRET`). A product accepts them only through `verifyIdentity(secret, request.headers)` ([`src/identity.ts`](src/identity.ts)): bad signature, other secret or a timestamp more than 60 s off is `null` → `UNAUTHENTICATED`. The agent's token never reaches a product, only its hash.
+`x-wcm-via: gateway`, `x-wcm-token-hash`, `x-wcm-scopes`, `x-wcm-agent`, `x-wcm-run-id` (the same for every call of one run, so the product ties its audit row to the gateway's), `x-wcm-timestamp` and `x-wcm-signature` (HMAC-SHA256 over those fields with `WCM_GATEWAY_SECRET`). A product accepts them only through `verifyIdentity(secret, request.headers)` from `@wefaber/codemode-mcp` ([`identity.ts`](../../packages/mcp/src/identity.ts); [how a product wires it](../../packages/mcp/README.md#behind-the-gateway)): bad signature, other secret or a timestamp more than 60 s off is `null` → `UNAUTHENTICATED`. The agent's token never reaches a product, only its hash.
 
 ## Configuration
 
@@ -43,7 +43,8 @@ Each call `await codemode.todo.items.create({ ... })` becomes one `POST <product
 | `PORT`                   | `4171`              | Listens on `127.0.0.1` only; Nginx proxies                                          |
 | `WCM_RUN_TIMEOUT_MS`     | `15000`             | Whole run, including the product calls inside it (a product run alone may take 5 s) |
 | `WCM_PRODUCT_TIMEOUT_MS` | `10000`             | One call to a product                                                               |
-| `WCM_RUNS_PER_MINUTE`    | `60`                | Per token                                                                           |
+| `WCM_RUNS_PER_MINUTE`    | `60`                | Runs per token, in memory                                                           |
+| `WCM_CALLS_PER_MINUTE`   | `600`               | Calls to products per token, across its runs, in SQLite; over it, `RATE_LIMITED`    |
 | `WCM_MAX_BYTES_PER_DAY`  | `10485760`          | Result bytes per token per day; over it, `RATE_LIMITED`                             |
 
 ## Admin (on the host that holds the database)
@@ -63,8 +64,10 @@ bun src/cli.ts token revoke <hash-prefix>
 
 Templates in [`deploy/`](deploy): the systemd unit and the Nginx vhost. The delivery path is the usual one (branch → PR → merge → self-hosted runner → blue/green on `/srv/codemode/current`), not a manual copy. Cutting `mcp.wefaber.net` over from wegraf (PLAN Task 5.4) needs the wegraf move to `wegraph.wefaber.net` first (D1) and is an infra step: DNS, certificate and the Nginx reload.
 
+## Budgets
+
+Per token, three limits, all answering `RATE_LIMITED`: runs per minute (in memory), calls to products per minute and result bytes per day (both in SQLite, tables `call_usage` and `usage`). Each forwarded call counts one, whichever product serves it; a call over the limit fails inside the code (catchable, `RATE_LIMITED` in the message) and never reaches the product. The window is a fixed calendar minute: a token can spend its limit at the end of one minute and again at the start of the next. The default of 600 is 10 calls per second sustained: one run is capped at 50 calls (R6) and 60 runs per minute could make 3000, so 600 is a real ceiling (a maximal run uses 8% of it) and still lets ~60 average runs of 10 calls through. Raise it per deployment with `WCM_CALLS_PER_MINUTE`.
+
 ## Not done yet
 
-- **Per-minute call budget.** The gateway limits runs per minute and result bytes per day per token; a run is capped at 50 calls (R6). A calls-per-minute counter on top is the stricter reading of SPEC §8.
-- **`verifyIdentity` for products** lives here. When the first product adopts the gateway (PLAN Phase 4), it moves to `@wefaber/codemode-mcp` so products import it instead of copying it.
 - **Clef ranking** (D4) is not part of this: `search` returns what the code filters.

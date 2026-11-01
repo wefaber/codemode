@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite'
 
-/** The gateway's own state: catalog, tokens, audit rows (SPEC §9) and the daily byte budget. */
+/** The gateway's own state: catalog, tokens, audit rows (SPEC §9) and the budgets: result bytes per day, calls per minute. */
 export function openDb(path: string): Database {
   const db = new Database(path, { create: true })
   db.exec('PRAGMA journal_mode = WAL')
@@ -44,6 +44,12 @@ export function openDb(path: string): Database {
       day        TEXT NOT NULL,
       bytes      INTEGER NOT NULL,
       PRIMARY KEY (token_hash, day)
+    );
+    CREATE TABLE IF NOT EXISTS call_usage (
+      token_hash TEXT NOT NULL,
+      minute     INTEGER NOT NULL,
+      calls      INTEGER NOT NULL,
+      PRIMARY KEY (token_hash, minute)
     );
   `)
   return db
