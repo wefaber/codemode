@@ -93,3 +93,57 @@ Con ID estable (hash del código generado) el número de workers únicos por dí
 Se pierde el camino de cero configuración para Claude Code, que es un beneficio real. Se compensa así: el CLI stdio **se genera del mismo registry** (`@wefaber/codemode-cli`, Fase 1.6). Claude Code sigue teniendo un servidor local — generado, no escrito a mano — y el registro es el mismo que usa el gateway. Un solo lugar donde agregar una operación.
 
 Si el CLI generado resulta peor que el actual en la práctica, se vuelve atrás sin tocar el registry: es una decisión de transporte, no de modelo de datos.
+
+---
+
+## D4 — Clef en el gateway: ranker opcional sobre `search`, no router de tools
+
+**Estado: propuesta** (2026-11-01). Sin evaluación propia todavía; los puntos marcados "por confirmar" vienen del informe de Ether y no se verificaron contra el código de WeGraph.
+
+### Qué se propone en el diagrama
+
+`AI Agent → request → Code Mode Gateway → Clef → Tool → {Design, Programming, Graph, Rules}`. El agente expone qué puede proporcionar; Clef decide qué tools hacen falta para ese tipo de request y, si lo considera útil, aprueba y devuelve las Tools necesarias.
+
+### Qué hay hoy
+
+- En este repo no hay nada sobre Clef: `docs/` y el árbol no lo mencionan, y no existe `apps/gateway`.
+- Lo medido está en WeGraph (por confirmar: `wegraph/docs/EVALUATION.md:114-141`): gate de relevancia por nodo con `@cf/cloudflare/clef-flash` (9B), coherencia de diseño 56% → 89%, tokens de entrada 929 → 425, evitación de errores 33% → 100%. Cambiar el wording sí/no bajó el AUC de 0,71 a 0,54.
+- Ahí Clef es un **gate de relevancia** (devuelve probabilidades, nunca texto) y no un router de tools. El candidato que no pasa no viaja en el contexto; no es un error.
+- La escalada a `clef` (27B) está declarada pero no se ejecuta (`escalated_score` siempre es null). Modelos chicos de la familia (144M, 421M, 4B) se descartaron por degenerar el gate.
+- LiquidAI: se evaluó según Faku, pero no hay registro citable. Sin números no entra en la decisión.
+- Inferencia: no corre en el VPS (6 cores, sin GPU). En WeGraph corre por Workers AI dentro del Worker, o local por llama.cpp.
+
+### Choque con el spec
+
+- **R2** fija exactamente dos tools (`search`, `execute`). Un modelo que arma la lista de tools devueltas es publicar tools por la puerta de atrás.
+- **§8** define el gateway como "sin lógica de dominio, una sola responsabilidad: enrutar", y el gateway es stateless. Un modelo en el camino crítico agrega una dependencia de IA, latencia y un modo de falla nuevo.
+- El gate con rechazo ("aprueba si es útil") deja al agente trabado cuando Clef se equivoca; un falso negativo cuesta más que devolver una tool de más.
+
+### Propuesta
+
+1. **Clef no decide qué tools existen.** El agente sigue viendo `search` + `execute` (R2 intacto). Clef, si se usa, **ordena y recorta** lo que devuelve `search` sobre el catálogo.
+2. **Es degradable.** Si Clef falla, `search` devuelve el orden determinístico del catálogo (prefijo `codemode.<producto>.*` y palabras clave). El gateway sigue stateless y funcional sin modelo.
+3. **Salida cerrada.** La entrada es el request más los IDs de ops candidatas; la salida es una lista de IDs con score. Nunca texto libre. Una inyección en el request solo puede reordenar.
+4. **Permisos antes del modelo.** Los scopes del token filtran los candidatos antes de que lleguen a Clef. El modelo nunca amplía permisos ni los decide.
+5. **No hay rechazo duro.** Baja confianza → se devuelve el conjunto completo del producto, ordenado. Se prefiere recall sobre precision.
+6. **Escalada por confianza** (27B) solo si Flash no alcanza en la evaluación, no por defecto.
+7. **Log de decisiones**: request, candidatos, orden devuelto y si el agente terminó pidiendo más. Es el dataset para mejorar el ranking y se suma a la tabla de auditoría de §9.
+
+### Criterio de aceptación
+
+Clef entra al gateway solo si **supera al baseline determinístico en recall@k** sobre un set etiquetado propio (requests reales por tipo: Design, Programming, Graph, Rules). El umbral de k y de mejora se fija **antes** de correr la evaluación. Se comparan `clef-flash`, `clef` 27B y LiquidAI sobre el mismo set, con latencia p95 medida en el lugar donde correría.
+
+### Preguntas abiertas
+
+- **Dónde corre la inferencia para el gateway.** El gateway vive en el VPS (D2) y no hay GPU: implica llamar a Workers AI por API. El token de Cloudflare disponible en el VPS es solo de zona (D2); hace falta uno con permiso de Workers AI. Presupuesto de latencia por definir.
+- **`Rules` no es una tool**: es contexto o política. Decidir si se sirve como op de catálogo o se inyecta aparte.
+- **Estado por sesión**: grants con TTL para no renegociar en cada llamada, o stateless puro.
+- **LiquidAI**: registrar la evaluación previa (o repetirla) antes de usarla como argumento.
+
+### Qué se descarta
+
+Clef como router que arma el listado de tools y como gate que aprueba o rechaza requests del agente.
+
+### Fuente
+
+Informe de Ether (sesión `codemode-clef`, 2026-11-01), contrastado contra `docs/` y `SPEC.md` de este repo.

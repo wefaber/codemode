@@ -258,3 +258,5 @@ Detalle y evidencia en `./DECISIONS.md`.
 **D2 — Tres adaptadores de sandbox, `quickjs` como default.** Aceptada. Verificado: Dynamic Workers es solo Workers Paid ($5/mes, +$0,002 por worker único/día, máx. 4 en vuelo por request). El VPS con QuickJS cubre el volumen actual (decenas de executes/día) a costo cero. wegraf usa `quickjs-wasm` dentro de su Worker porque sus ops necesitan D1/R2. `dynamic-workers` queda como opción a habilitar con datos del tablero de uso.
 
 **D3 — `kit` deja de ser servidor stdio y pasa a catálogo del gateway.** Aceptada. El stdio se genera del mismo registry (`@wefaber/codemode-cli`); `check_conformance` se elimina como tool porque la conformidad es un test, no una operación.
+
+**D4 — Clef en el gateway: ranker opcional sobre `search`, no router de tools.** Propuesta (2026-11-01), sin evaluación propia. R2 no cambia: Clef, si entra, ordena y recorta lo que devuelve `search`, con salida cerrada, permisos aplicados antes del modelo y fallback determinístico. Solo entra si supera al baseline en recall@k sobre un set propio.
