@@ -147,3 +147,19 @@ Clef como router que arma el listado de tools y como gate que aprueba o rechaza 
 ### Fuente
 
 Informe de Ether (sesión `codemode-clef`, 2026-11-01), contrastado contra `docs/` y `SPEC.md` de este repo.
+
+---
+
+## D5 — Gateway: reenvío por código, tokens propios e identidad firmada
+
+**Estado: propuesta** (2026-11-01), implementada en `apps/gateway` (PLAN Fase 5, tareas 5.1 a 5.3). Se acepta con el merge del PR.
+
+Lo que el plan no fijaba y hubo que decidir:
+
+1. **`Bun.serve()` en vez de Elysia.** El gateway es un único `fetch(Request) → Response` sobre el handler web del paquete; no hay rutas con esquema ni GraphQL. Es el caso de "shell chico" de la regla de la casa.
+2. **Cada llamada se reenvía como un `execute` del producto.** `await codemode.todo.items.create(x)` hace `POST <url>/codemode/execute` con `return await codemode.todo.items.create(x)`. Los productos no cambian y siguen validando entrada y scope por su cuenta (SPEC §6, R3). Costo: una corrida de producto por llamada. Alternativa descartada: un endpoint por operación, que agrega una cuarta superficie al contrato. Se revisa con el p95 de la tabla `runs`.
+3. **Tokens propios del gateway** (`sha256`, scopes que cubren varios productos, importación de los `mck_…` existentes). Validar contra cada producto no sirve: el gateway necesita los scopes antes de armar `search` y el namespace de `execute` (R5).
+4. **Identidad firmada**: `x-wcm-via`, `x-wcm-token-hash`, `x-wcm-scopes`, `x-wcm-agent`, `x-wcm-run-id`, `x-wcm-timestamp` y `x-wcm-signature` (HMAC-SHA256 sobre esos campos con `WCM_GATEWAY_SECRET`), con tolerancia de 60 s. El token del agente nunca llega al producto; el `run_id` es el mismo para todas las llamadas de una corrida, así que cada producto liga su auditoría a la del gateway.
+5. **Presupuesto**: corridas por minuto y bytes de resultado por día, por token. El contador de llamadas por minuto del SPEC §8 queda pendiente (una corrida ya está acotada a 50 llamadas por R6).
+
+La decisión se revisa con datos de la tabla `runs` (SPEC §9), igual que D2.

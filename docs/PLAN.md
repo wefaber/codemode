@@ -178,6 +178,8 @@ Las 23 tools de `server/core/mcp.ts` se reescriben como ops. Se agrupan por recu
 
 ## Fase 5 — Gateway (8 h) [P0]
 
+**Estado (2026-11-01): tareas 5.1 a 5.3 implementadas en `apps/gateway`** (ver `apps/gateway/README.md` y D5); 5.4 (DNS y corte) pendiente: depende de mover wegraf a `wegraph.wefaber.net` (Fase 4) y es infra.
+
 ### Task 5.1 — Servicio `codemode-gateway` en el VPS (2 h)
 
 **Crear**: `apps/gateway/src/index.ts` — servicio Bun (Elysia), sin dominio. Rutas `/mcp`, `/codemode/search`, `/codemode/execute`, `/health`, `/catalog`.
