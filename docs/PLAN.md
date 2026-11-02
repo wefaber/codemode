@@ -45,7 +45,7 @@ cd ~/repos/codemode && bun init -y
 
 `package.json` con workspaces `packages/*`; `tsconfig.json` estricto; `oxlint` + `oxfmt` como el resto de los repos.
 
-**Verificación**: `bun install && bun run check` en verde con el repo vacío.
+**Verificación**: `bun install && bun run verify` en verde con el repo vacío.
 
 ### Task 1.2 — `defineOp` y el registry (1 h 30)
 
@@ -61,7 +61,7 @@ Copia el contrato de `mychecklist/services/registry.ts` si existe; si no, es est
 **Crear**: `packages/core/src/spec.ts`
 `buildSpec(registry)` → `{ version, product, ops: [{ id, scope, summary, input, output }] }` serializando TypeBox a JSON Schema. `emitDts(spec)` → `client.d.ts` con un namespace por recurso: `codemode.checklist.items.create(input): Promise<Output>`.
 
-**Crear**: `packages/core/src/cli.ts` — `bun run gen` escribe `spec.json` y `client.d.ts`; `bun run check` compara y falla con `spec.json desactualizado, corriste gen?`.
+**Crear**: `packages/core/src/cli.ts` — `bun run gen` escribe `spec.json` y `client.d.ts`; `bun run verify` compara y falla con `spec.json desactualizado, corriste gen?`.
 
 **Verificación**: en un producto de prueba, agregar una op nueva y correr `check` → falla; `gen` → pasa. Commit de ambos archivos.
 
