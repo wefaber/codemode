@@ -2,7 +2,7 @@ pre-push:
   parallel: true
   commands:
     lint:
-      glob: "*.{ts,tsx,js,jsx}"
+      glob: '*.{ts,tsx,js,jsx}'
       run: bunx oxlint {push_files}
     typecheck:
       run: bun check
